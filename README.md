@@ -1,5 +1,10 @@
 # MyPassKeys
 
+[![CI](https://github.com/dieterwiesflecker/MyPassKeys/actions/workflows/ci.yml/badge.svg)](https://github.com/dieterwiesflecker/MyPassKeys/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![WebAuthn](https://img.shields.io/badge/FIDO2-WebAuthn-3423A6.svg)](https://www.w3.org/TR/webauthn-2/)
+
 **A self-hostable, multi-tenant FIDO2 / WebAuthn passkey authentication server** with
 DPoP (Demonstration of Proof-of-Possession) token binding — built to issue signed,
 sender-constrained tokens for your own applications without depending on a third-party
