@@ -10,7 +10,7 @@ Instead, report privately through one of:
 
 - GitHub's [private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability)
   ("Report a vulnerability" under the **Security** tab of this repository), or
-- email **<SECURITY_CONTACT_EMAIL>**.
+- email **urslis@proton.me**.
 
 Please include:
 
