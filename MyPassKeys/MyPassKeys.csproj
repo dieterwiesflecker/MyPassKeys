@@ -31,8 +31,8 @@
         <PackageReference Include="Fido2" Version="4.0.1" />
         <PackageReference Include="Fido2.AspNet" Version="4.0.1" />
         <PackageReference Include="Fido2.Models" Version="4.0.1" />
-        <PackageReference Include="Marten" Version="9.29.0" />
-        <PackageReference Include="Marten.AspNetCore" Version="9.29.0" />
+        <PackageReference Include="Marten" Version="9.30.0" />
+        <PackageReference Include="Marten.AspNetCore" Version="9.30.0" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
         <!-- Pinned above the transitive 2.0.0 to patch GHSA-v5pm-xwqc-g5wc (circular schema
              reference DoS in OpenAPI parsing; fixed in 2.7.5). Must stay on the 2.x line:
