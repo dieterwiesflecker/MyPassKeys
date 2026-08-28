@@ -10,6 +10,7 @@
         <!-- ReadyToRun: pre-compiles IL to native code at publish time.
              Faster startup and lower JIT overhead at runtime, with no AOT incompatibility risk. -->
         <PublishReadyToRun>true</PublishReadyToRun>
+        <UserSecretsId>4c850e42-0609-4b7d-9b3f-fc2578cce14e</UserSecretsId>
         <!-- Trim unused framework code to reduce image size.
              TrimmerRootDescriptor or suppress warnings if trimming causes issues with Marten/Fido2. -->
 <!--        <PublishTrimmed>true</PublishTrimmed>
