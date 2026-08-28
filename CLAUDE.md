@@ -34,7 +34,7 @@ dotnet run --project MyPassKeys/
 
 ### Services (compose.yaml)
 - **MyPassKeys** — ASP.NET Core 10.0 API (port 8080)
-- **db** — PostgreSQL 16 (document store via Marten)
+- **db** — PostgreSQL 18 (document store via Marten)
 - **redis** — Redis 8 (challenge storage, JTI replay detection, tenant caching)
 
 Production overrides in `compose.prod.yaml`. `deploy.sh` builds the image locally, ships it via SSH, and runs `docker compose -f compose.yaml -f compose.prod.yaml up` on the server behind a reverse proxy (Caddy). See `DEPLOYMENT.md`.
