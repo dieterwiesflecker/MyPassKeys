@@ -119,6 +119,13 @@ full_deploy() {
   echo "=== Starting all services ==="
   ssh "$SERVER" "cd $REMOTE_DIR && $COMPOSE up -d --force-recreate"
 
+  # Reclaim disk: each deploy loads a fresh image and rebuilds, leaving the previous images
+  # dangling plus build cache behind — left unpruned this eventually fills the disk and Postgres
+  # fails with "No space left on device". The running stack's images are in use, so -a is safe;
+  # volumes are never touched.
+  echo "=== Reclaiming Docker disk on server ==="
+  ssh "$SERVER" "docker image prune -af >/dev/null 2>&1; docker builder prune -af >/dev/null 2>&1; echo -n 'Free space: '; df -h / | awk 'NR==2{print \$4\" (\"\$5\" used)\"}'"
+
   rm -f /tmp/mypasskeys.tar.gz
 
   echo "=== Verifying ==="
