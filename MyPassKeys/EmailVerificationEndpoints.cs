@@ -83,6 +83,12 @@ public static class EmailVerificationEndpoints
             await db.StringSetAsync(codeKey, code, TimeSpan.FromMinutes(10));
             await db.StringSetAsync(cooldownKey, "1", TimeSpan.FromSeconds(60));
 
+            // Reset the attempt counter so a fresh code starts with a clean slate. Otherwise an
+            // attacker who exhausts the counter (5 verify requests) against the old code leaves it
+            // near the limit with live TTL, so the legitimate user's first entry on the NEW code
+            // trips "Too many attempts" and burns it too — a repeatable lockout.
+            await db.KeyDeleteAsync($"EmailCodeAttempts:{tenant.Id}:{email}");
+
             var sent = await emailService.SendVerificationCodeAsync(email, code, tenant.ServerName);
             if (!sent)
             {
