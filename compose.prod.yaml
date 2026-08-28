@@ -13,6 +13,7 @@ services:
       - ConnectionStrings__Postgres=Host=db;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD}
       - Resend__ApiKey=${RESEND_API_KEY}
+      - Resend__FromEmail=${RESEND_FROM_EMAIL:-noreply@passkey.minomart.uk}
       # KEK for signing-key encryption at rest — required, the app refuses to start without it.
       - MyPassKeys__KeyEncryptionKey=${KEY_ENCRYPTION_KEY}
       # Previous KEK, only populated during a rotation. Leave PREVIOUS_KEY_ENCRYPTION_KEY unset in
