@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1280" viewBox="0 0 1280 1280">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1020"/>
+      <stop offset="1" stop-color="#161F38"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7C5CFC"/>
+      <stop offset="1" stop-color="#34D0C4"/>
+    </linearGradient>
+  </defs>
+
+  <!-- full canvas; the design lives in the centre 640-tall band (y 320..960) -->
+  <rect width="1280" height="1280" fill="url(#bg)"/>
+  <circle cx="1090" cy="470" r="360" fill="#7C5CFC" opacity="0.12"/>
+  <circle cx="1200" cy="920" r="300" fill="#34D0C4" opacity="0.08"/>
+  <rect x="0" y="320" width="1280" height="8" fill="url(#accent)"/>
+
+  <!-- passkey shield + keyhole -->
+  <g transform="translate(96,552)">
+    <rect x="-18" y="-18" width="212" height="212" rx="46" fill="url(#accent)" opacity="0.13"/>
+    <path d="M88 6 L166 40 L166 94 C166 133 133 160 88 172 C43 160 10 133 10 94 L10 40 Z" fill="url(#accent)"/>
+    <circle cx="88" cy="78" r="19" fill="#0B1020"/>
+    <path d="M79 88 L97 88 L102 130 L74 130 Z" fill="#0B1020"/>
+  </g>
+
+  <!-- wordmark + copy -->
+  <text x="320" y="590" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="94" font-weight="700" fill="#F5F7FF">MyPassKeys</text>
+  <text x="324" y="650" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="32" font-weight="500" fill="#CDD5EC">Multi-tenant FIDO2 / WebAuthn passkey server</text>
+  <text x="324" y="698" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="26" font-weight="400" fill="#9AA3C2">DPoP-bound tokens &#183; per-tenant ES256 signing &#183; RBAC + groups</text>
+
+  <text x="324" y="790" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="25" font-weight="600" fill="#7E88A8">Apache-2.0 &#183; .NET 10 &#183; PostgreSQL + Redis &#183; self-hostable</text>
+</svg>
