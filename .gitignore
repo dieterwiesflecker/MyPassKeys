@@ -1,0 +1,20 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+
+# Secrets / local environment — NEVER commit
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS / IDE
+.DS_Store
+.idea/
+.vs/
+*.user

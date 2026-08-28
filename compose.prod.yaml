@@ -1,0 +1,23 @@
+# Production overrides. Use together with compose.yaml:
+#   docker compose -f compose.yaml -f compose.prod.yaml up -d
+#
+# All ${...} values are read from a `.env` file sitting next to these compose files on the
+# server (copy .env.example → .env and fill it in). See DEPLOYMENT.md.
+services:
+  mypasskeys:
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__Postgres=Host=db;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD}
+      - Resend__ApiKey=${RESEND_API_KEY}
+      # KEK for signing-key encryption at rest — required, the app refuses to start without it.
+      - MyPassKeys__KeyEncryptionKey=${KEY_ENCRYPTION_KEY}
+      # Previous KEK, only populated during a rotation. Leave PREVIOUS_KEY_ENCRYPTION_KEY unset in
+      # .env normally (resolves to empty, which the app ignores). See DEPLOYMENT.md → "KEK rotation".
+      - MyPassKeys__PreviousKeyEncryptionKeys__0=${PREVIOUS_KEY_ENCRYPTION_KEY:-}
+      # Trust the Docker bridge so X-Forwarded-For from the reverse proxy is honoured for rate limiting.
+      - ForwardedHeaders__KnownNetworks__0=172.16.0.0/12
+      - ForwardedHeaders__KnownNetworks__1=10.0.0.0/8
