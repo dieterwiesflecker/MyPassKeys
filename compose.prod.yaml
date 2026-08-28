@@ -18,6 +18,14 @@ services:
       # Previous KEK, only populated during a rotation. Leave PREVIOUS_KEY_ENCRYPTION_KEY unset in
       # .env normally (resolves to empty, which the app ignores). See DEPLOYMENT.md → "KEK rotation".
       - MyPassKeys__PreviousKeyEncryptionKeys__0=${PREVIOUS_KEY_ENCRYPTION_KEY:-}
+      # --- Deployment identity (required in production; set these in the server .env) ---
+      # DEPLOYMENT_HOST: the public hostname this install answers on (host-gate 404s anything else).
+      # ISSUER_BASE_URL: base for per-tenant token issuers ({base}/t/{id}) — keep stable for the life
+      #   of your tenants; resource servers reconstruct issuers from it.
+      # BOOTSTRAP_OWNER_EMAIL: the account guaranteed tenantadmin in the management tenant.
+      - MyPassKeys__DeploymentHosts__0=${DEPLOYMENT_HOST:?set DEPLOYMENT_HOST in .env, e.g. auth.example.com}
+      - MyPassKeys__IssuerBaseUrl=${ISSUER_BASE_URL:?set ISSUER_BASE_URL in .env, e.g. https://auth.example.com}
+      - Tenant__BootstrapOwnerEmail=${BOOTSTRAP_OWNER_EMAIL:?set BOOTSTRAP_OWNER_EMAIL in .env}
       # Trust the Docker bridge so X-Forwarded-For from the reverse proxy is honoured for rate limiting.
       - ForwardedHeaders__KnownNetworks__0=172.16.0.0/12
       - ForwardedHeaders__KnownNetworks__1=10.0.0.0/8
