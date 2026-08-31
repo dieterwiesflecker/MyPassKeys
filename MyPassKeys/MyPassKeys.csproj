@@ -40,7 +40,7 @@
              Microsoft.AspNetCore.OpenApi 10.0.9 is built against Microsoft.OpenApi 2.x, and 3.x
              makes IOpenApiMediaType.Example read-only, which breaks its source generator. -->
         <PackageReference Include="Microsoft.OpenApi" Version="2.9.0" />
-        <PackageReference Include="Scalar.AspNetCore" Version="2.17.1" />
+        <PackageReference Include="Scalar.AspNetCore" Version="2.17.2" />
         <PackageReference Include="StackExchange.Redis" Version="3.1.31" />
         <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.22.0" />
     </ItemGroup>
