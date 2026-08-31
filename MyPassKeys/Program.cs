@@ -13,6 +13,14 @@ using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateSlimBuilder(args);
 
+// CreateSlimBuilder (unlike CreateBuilder) does not add the user-secrets provider, so wire it up
+// in Development. This gives local developers a repo-safe place to override committed defaults with
+// personal values (e.g. Tenant:BootstrapOwnerEmail = your own email) without editing appsettings.json:
+//   dotnet user-secrets set "Tenant:BootstrapOwnerEmail" "you@example.com"
+// The UserSecretsId lives in MyPassKeys.csproj. Never used in Production.
+if (builder.Environment.IsDevelopment())
+  builder.Configuration.AddUserSecrets<Program>(optional: true);
+
 builder.Logging.AddConfiguration(builder.Configuration.GetSection("Logging"));
 builder.Logging.AddConsole();
 
