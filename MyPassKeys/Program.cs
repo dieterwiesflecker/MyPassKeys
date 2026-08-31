@@ -349,6 +349,10 @@ using (var bootstrapScope = app.Services.CreateScope())
     management = new Tenant
     {
       IsManagementTenant = true,
+      // Invite-only by default: the admin portal must not accept anonymous self-registration.
+      // Doesn't lock out the operator — the bootstrap-owner invariant below pre-creates that user
+      // (the pre-created user IS the invite), so they still attach their first passkey normally.
+      RegistrationMode = RegistrationModes.InviteOnly,
       Hosts = [],
       ServerName = "MyPassKeys Management",
       AllowedOrigins = bootstrapOrigins,
