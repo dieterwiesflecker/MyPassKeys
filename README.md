@@ -50,11 +50,9 @@ secret** between the auth server and your APIs.
 ## Quickstart (local, Docker)
 
 ```bash
-# 1. Copy the sample environment and fill in secrets
+# 1. Copy the sample environment. The defaults already work for local development —
+#    no edits needed to get started (see the comments in the file for what each does).
 cp .env.example .env
-#    - set POSTGRES_PASSWORD, REDIS_PASSWORD
-#    - generate a KEK:  openssl rand -base64 32   ->  KEY_ENCRYPTION_KEY
-#    - (optional) set RESEND_API_KEY for outbound verification emails
 
 # 2. Bring everything up
 docker compose -f compose.yaml up --build
@@ -63,12 +61,21 @@ docker compose -f compose.yaml up --build
 The API is then reachable on `http://localhost:8080`. In Development mode an interactive API
 reference is served at `/scalar/v1`.
 
+Everything the Docker path needs lives in `.env` — you do not edit `appsettings.json`. The
+committed defaults ship a **dev-only** KEK and passwords so local just works; the values you must
+change before going to production are flagged "REQUIRED IN PRODUCTION" in `.env.example`.
+
 ### Running the app standalone
 
 ```bash
-# Requires a local PostgreSQL + Redis (see appsettings.json for connection strings)
+# Start Postgres + Redis from the same compose file, then run the app on the host:
+docker compose -f compose.yaml up -d db redis
 dotnet run --project MyPassKeys/
 ```
+
+A standalone `dotnet run` does **not** read `.env`; it uses `appsettings.json` +
+`appsettings.Development.json` (dev-only localhost defaults that match `.env.example`). Kestrel
+listens on `http://localhost:5205`.
 
 ### Tests
 
@@ -78,17 +85,57 @@ dotnet test MyPassKeys.Tests/MyPassKeys.Tests.csproj
 
 ## Configuration
 
-All configuration lives in `appsettings.json` (documented inline) and can be overridden with
-environment variables using the standard ASP.NET `__` convention (e.g.
-`MyPassKeys__KeyEncryptionKey`). The must-set values for any real deployment:
+Configuration comes from two places depending on how you run the app:
 
-| Setting | Purpose |
-| --- | --- |
-| `MyPassKeys:KeyEncryptionKey` | **Required.** Base64 32-byte KEK encrypting signing keys at rest. The app refuses to start without it. |
-| `MyPassKeys:DeploymentHosts` | Hostnames where this installation is reachable; anything else is 404'd. |
-| `MyPassKeys:BootstrapManagementOrigins` | Origins seeded onto the management tenant on first startup. |
-| `Tenant:BootstrapOwnerEmail` | Email guaranteed to hold `tenantadmin` in the management tenant. |
-| `Resend:ApiKey` / `Resend:FromEmail` | Outbound email for verification codes. |
+- **Docker (local & production)** — everything is driven by the **`.env`** file next to the compose
+  files. `compose.yaml` maps each `.env` variable to the app's config, so `.env` is the *only* file
+  you edit. `.env.example` is the documented, copy-me template.
+- **Standalone `dotnet run`** — reads `appsettings.json` + `appsettings.Development.json` (dev-only
+  localhost defaults). `.env` is not read on this path.
+
+Under the hood every setting is an ASP.NET config key overridable with the standard `__` env-var
+convention (e.g. `MyPassKeys__KeyEncryptionKey`); the compose files just wire the friendly `.env`
+names onto those keys. The values you must set for a **real deployment** (all flagged
+"REQUIRED IN PRODUCTION" in `.env.example`):
+
+| `.env` variable | Config key | Purpose |
+| --- | --- | --- |
+| `KEY_ENCRYPTION_KEY` | `MyPassKeys:KeyEncryptionKey` | **Required.** Base64 32-byte KEK encrypting signing keys at rest. The app refuses to start without it. Back it up. |
+| `DEPLOYMENT_HOST` | `MyPassKeys:DeploymentHosts` | Hostname where this installation is reachable; anything else is 404'd. |
+| `ISSUER_BASE_URL` | `MyPassKeys:IssuerBaseUrl` | Base for per-tenant token issuers; keep stable for the life of your tenants. |
+| `BOOTSTRAP_OWNER_EMAIL` | `Tenant:BootstrapOwnerEmail` | Email guaranteed to hold `tenantadmin` in the management tenant. |
+| `BOOTSTRAP_MANAGEMENT_ORIGIN` | `MyPassKeys:BootstrapManagementOrigins` | Admin-portal origin seeded onto the management tenant on first startup. |
+| `BOOTSTRAP_MANAGEMENT_ISSUER` / `BOOTSTRAP_MANAGEMENT_AUDIENCE` | `MyPassKeys:BootstrapManagementIssuer` / `…Audience` | JWT issuer/audience for the management tenant, seeded on first startup (blank → derived from `DEPLOYMENT_HOST`). |
+| `POSTGRES_PASSWORD` / `REDIS_PASSWORD` | `ConnectionStrings:*` | Strong, unique datastore credentials. |
+| `RESEND_API_KEY` / `RESEND_FROM_EMAIL` | `Resend:ApiKey` / `Resend:FromEmail` | Outbound email for verification codes. |
+
+## Local development vs. production
+
+MyPassKeys runs in one of two modes, selected by `ASPNETCORE_ENVIRONMENT`. **Local development is
+convenience-first** (ships with working throwaway secrets so it starts with zero setup);
+**production is safety-first** (nothing sensitive is committed, real secrets are required, and
+developer tooling is switched off). Understand the difference before you expose this to real users.
+
+| | **Local development** | **Production** |
+| --- | --- | --- |
+| How you run it | `docker compose -f compose.yaml up` **or** `dotnet run` / Rider Run | `docker compose -f compose.yaml -f compose.prod.yaml up -d` (via `./deploy.sh`) |
+| `ASPNETCORE_ENVIRONMENT` | `Development` | `Production` |
+| Where config comes from | Docker: `.env` with built-in local defaults · standalone: `appsettings.json` + `appsettings.Development.json` | The server's `.env` only — **you never edit `appsettings.json`** |
+| Reachable at | `http://localhost:8080` (Docker) / `http://localhost:5205` (standalone) | Your real hostname over **HTTPS**, behind a reverse proxy |
+| HTTPS | Not required — WebAuthn exempts `localhost` | **Required.** WebAuthn refuses non-HTTPS origins; you must terminate TLS (Caddy/Traefik/nginx) |
+| KEK (`KEY_ENCRYPTION_KEY`) | A shared **dev-only** throwaway key, pre-filled so it just works | A unique key you generate and **back up**; `./deploy.sh` makes one if absent. Losing it is unrecoverable |
+| DB / Redis passwords | Throwaway `mypasskeys` | Strong, unique values you set |
+| Required-var enforcement | Lenient — sensible defaults fill the gaps | Strict — the stack refuses to start if `DEPLOYMENT_HOST` / `ISSUER_BASE_URL` / `BOOTSTRAP_OWNER_EMAIL` are missing |
+| Scalar API explorer (`/scalar/v1`) | **On** | **Off** |
+| `/debug/token` (decodes tokens **without auth**) | **On** | **Off** — never exposed |
+| Email verification codes | Logged to the console if `RESEND_API_KEY` is empty | Sent for real via a configured Resend key |
+| Trusted proxies (`X-Forwarded-For`) | Loopback only | You must list your proxy/CDN CIDRs, or client IPs (used for rate limiting) resolve to the proxy |
+
+**Never treat the local defaults as production-ready.** The committed dev KEK and `mypasskeys`
+passwords are public in this repo, and `/scalar/v1` + `/debug/token` deliberately expose internals.
+A real deployment must run in `Production` mode (which `./deploy.sh` and `compose.prod.yaml` do for
+you) with its own secrets in the server's `.env`. See [DEPLOYMENT.md](DEPLOYMENT.md) for the full
+production runbook.
 
 ## How it fits together
 

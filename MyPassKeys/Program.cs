@@ -344,10 +344,14 @@ using (var bootstrapScope = app.Services.CreateScope())
       Hosts = [],
       ServerName = "MyPassKeys Management",
       AllowedOrigins = bootstrapOrigins,
-      JwtIssuer = app.Configuration["MyPassKeys:BootstrapManagementIssuer"]
-                  ?? $"https://{deploymentHosts[0]}",
-      JwtAudience = app.Configuration["MyPassKeys:BootstrapManagementAudience"]
-                    ?? $"api://{deploymentHosts[0]}",
+      // Env vars set to an empty string (e.g. ${BOOTSTRAP_MANAGEMENT_AUDIENCE:-} in compose.prod.yaml)
+      // read back as "" rather than null, so treat blank as "not set" and fall back to the derived default.
+      JwtIssuer = app.Configuration["MyPassKeys:BootstrapManagementIssuer"] is { } issuer && !string.IsNullOrWhiteSpace(issuer)
+                  ? issuer
+                  : $"https://{deploymentHosts[0]}",
+      JwtAudience = app.Configuration["MyPassKeys:BootstrapManagementAudience"] is { } audience && !string.IsNullOrWhiteSpace(audience)
+                    ? audience
+                    : $"api://{deploymentHosts[0]}",
       JwtKeys = [TenantEndpoints.CreateKeyEntry(bootstrapKeyProtector)]
     };
     await bootstrapDb.UpsertTenantAsync(management);

@@ -13,7 +13,7 @@ services:
       - ConnectionStrings__Postgres=Host=db;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD}
       - Resend__ApiKey=${RESEND_API_KEY}
-      - Resend__FromEmail=${RESEND_FROM_EMAIL:-noreply@passkey.minomart.uk}
+      - Resend__FromEmail=${RESEND_FROM_EMAIL:-noreply@example.com}
       # KEK for signing-key encryption at rest — required, the app refuses to start without it.
       - MyPassKeys__KeyEncryptionKey=${KEY_ENCRYPTION_KEY}
       # Previous KEK, only populated during a rotation. Leave PREVIOUS_KEY_ENCRYPTION_KEY unset in
@@ -27,6 +27,14 @@ services:
       - MyPassKeys__DeploymentHosts__0=${DEPLOYMENT_HOST:?set DEPLOYMENT_HOST in .env, e.g. auth.example.com}
       - MyPassKeys__IssuerBaseUrl=${ISSUER_BASE_URL:?set ISSUER_BASE_URL in .env, e.g. https://auth.example.com}
       - Tenant__BootstrapOwnerEmail=${BOOTSTRAP_OWNER_EMAIL:?set BOOTSTRAP_OWNER_EMAIL in .env}
+      # Admin-portal origin seeded onto the management tenant on first startup only. Optional
+      # (edit later via PUT /tenants/{id}); set it to your portal's origin for a clean first boot.
+      - MyPassKeys__BootstrapManagementOrigins__0=${BOOTSTRAP_MANAGEMENT_ORIGIN:-}
+      # Management-tenant JWT issuer/audience, seeded on first startup only. Optional — empty falls
+      # back to https://<DEPLOYMENT_HOST> / api://<DEPLOYMENT_HOST>. Your admin-portal API validates
+      # tokens against the audience, so set it if that default doesn't match your resource server.
+      - MyPassKeys__BootstrapManagementIssuer=${BOOTSTRAP_MANAGEMENT_ISSUER:-}
+      - MyPassKeys__BootstrapManagementAudience=${BOOTSTRAP_MANAGEMENT_AUDIENCE:-}
       # Trust the Docker bridge so X-Forwarded-For from the reverse proxy is honoured for rate limiting.
       - ForwardedHeaders__KnownNetworks__0=172.16.0.0/12
       - ForwardedHeaders__KnownNetworks__1=10.0.0.0/8

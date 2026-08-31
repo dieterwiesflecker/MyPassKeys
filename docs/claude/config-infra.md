@@ -1,8 +1,17 @@
 # Configuration, Infrastructure & Conventions
 
+## Two config paths (env-first for Docker)
+
+There are two ways the app is configured, and they read different sources — keep them coherent when touching config:
+
+- **Docker (local + prod)** — `.env` (next to the compose files) is the **single source of truth**. `compose.yaml` maps friendly `.env` names onto ASP.NET config keys via the `__` convention; `compose.prod.yaml` layers on production hardening. `.env` is gitignored; `.env.example` is the documented template and MUST list every variable the compose files reference. **When you add a config key that operators set, wire it through BOTH compose files and add it to `.env.example`** — don't leave it appsettings-only, or the Docker path can't set it. Key mappings: `KEY_ENCRYPTION_KEY`→`MyPassKeys__KeyEncryptionKey`, `PREVIOUS_KEY_ENCRYPTION_KEY`→`MyPassKeys__PreviousKeyEncryptionKeys__0`, `DEPLOYMENT_HOST`→`MyPassKeys__DeploymentHosts__0`, `ISSUER_BASE_URL`→`MyPassKeys__IssuerBaseUrl`, `BOOTSTRAP_OWNER_EMAIL`→`Tenant__BootstrapOwnerEmail`, `BOOTSTRAP_MANAGEMENT_ORIGIN`→`MyPassKeys__BootstrapManagementOrigins__0`, `BOOTSTRAP_MANAGEMENT_ISSUER`/`BOOTSTRAP_MANAGEMENT_AUDIENCE`→`MyPassKeys__BootstrapManagementIssuer`/`MyPassKeys__BootstrapManagementAudience` (first-startup only; blank/empty falls back to `https://`/`api://{firstDeploymentHost}` — the seed reads blank env vars as unset), `RESEND_API_KEY`/`RESEND_FROM_EMAIL`→`Resend__ApiKey`/`Resend__FromEmail`, `POSTGRES_*`/`REDIS_PASSWORD`→the two connection strings. Base `compose.yaml` supplies **local-friendly defaults** for all of these (including a DEV-ONLY KEK fallback) so `docker compose up` works with an empty `.env`; `compose.prod.yaml` drops the KEK fallback and marks `DEPLOYMENT_HOST`/`ISSUER_BASE_URL`/`BOOTSTRAP_OWNER_EMAIL` required (`${VAR:?...}`).
+- **Standalone `dotnet run`** — reads `appsettings.json` + `appsettings.Development.json` only (**`.env` is not loaded** — .NET has no native `.env` support). `appsettings.Development.json` holds dev-only localhost defaults (connection strings, a throwaway KEK, `IssuerBaseUrl=http://localhost:5205`) so `dotnet run` works out of the box. Kestrel listens on `:5205` (`Properties/launchSettings.json`), which is why the committed `DeploymentHosts` default is `["localhost:5205"]`.
+
+**Committed files carry NO real secrets or personal data** (public repo): `appsettings.json` ships empty `KeyEncryptionKey`, generic `owner@example.com` / `auth.example.com` placeholders, and throwaway local dev passwords (`mypasskeys`). Real secrets live only in the gitignored `.env` / the server. When editing committed config, never paste a generated KEK, a real domain, or a real password.
+
 ## Configuration reference
 
-`appsettings.json` keys:
+`appsettings.json` keys (in Docker each is set from the corresponding `.env` variable above):
 - `ConnectionStrings:Postgres`, `ConnectionStrings:Redis`
 - `Jwt:Issuer`, `Jwt:Audience` — fallbacks when a resolved tenant carries no issuer/audience.
 - `MyPassKeys:DeploymentHosts` — hostnames where THIS installation is reachable; the host-gate middleware 404s anything else. Required (startup throws if empty).

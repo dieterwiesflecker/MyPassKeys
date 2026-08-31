@@ -61,9 +61,22 @@ services:
       - ConnectionStrings__Postgres=Host=db;Database=${POSTGRES_DB:-mypasskeys};Username=${POSTGRES_USER:-mypasskeys};Password=${POSTGRES_PASSWORD:-}
       - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:-}
       - Resend__ApiKey=${RESEND_API_KEY:-}
-      - Resend__FromEmail=${RESEND_FROM_EMAIL:-}
+      - Resend__FromEmail=${RESEND_FROM_EMAIL:-noreply@example.com}
       # KEK for signing-key encryption at rest — required, the app refuses to start without it.
-      - MyPassKeys__KeyEncryptionKey=${KEY_ENCRYPTION_KEY:-}
+      # Falls back to a DEV-ONLY key so `docker compose up` works with an empty .env locally.
+      # compose.prod.yaml drops this fallback and requires a real KEY_ENCRYPTION_KEY.
+      - MyPassKeys__KeyEncryptionKey=${KEY_ENCRYPTION_KEY:-qxjZ30LZyddPbTavIQWGayd/K2S6/cz5UuGmtXwF6hw=}
+      - MyPassKeys__PreviousKeyEncryptionKeys__0=${PREVIOUS_KEY_ENCRYPTION_KEY:-}
+      # --- Deployment identity (from .env; local-friendly defaults so local just works) ---
+      # See .env.example for what each of these means. compose.prod.yaml makes the first
+      # three REQUIRED (no defaults) so a production deploy can't silently start misconfigured.
+      - MyPassKeys__DeploymentHosts__0=${DEPLOYMENT_HOST:-localhost:8080}
+      - MyPassKeys__IssuerBaseUrl=${ISSUER_BASE_URL:-http://localhost:8080}
+      - Tenant__BootstrapOwnerEmail=${BOOTSTRAP_OWNER_EMAIL:-owner@example.com}
+      - MyPassKeys__BootstrapManagementOrigins__0=${BOOTSTRAP_MANAGEMENT_ORIGIN:-http://localhost:5173}
+      # Management-tenant JWT issuer/audience, seeded on first startup only (empty → derived from DEPLOYMENT_HOST).
+      - MyPassKeys__BootstrapManagementIssuer=${BOOTSTRAP_MANAGEMENT_ISSUER:-http://localhost:8080/management}
+      - MyPassKeys__BootstrapManagementAudience=${BOOTSTRAP_MANAGEMENT_AUDIENCE:-api://localhost:8080/management}
     depends_on:
       db:
         condition: service_healthy

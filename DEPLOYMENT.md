@@ -4,7 +4,15 @@ MyPassKeys is a single container (`mypasskeys`) plus PostgreSQL and Redis. It ex
 behind a TLS-terminating reverse proxy (Caddy, Traefik, nginx, …). WebAuthn **requires HTTPS**
 (except on `localhost`), so a real domain with a valid certificate is mandatory in production.
 
+This guide is the **production** path (`ASPNETCORE_ENVIRONMENT=Production`): real secrets in the
+server's `.env`, developer tooling off, required config enforced. For how that differs from running
+locally in Development mode, see [README → Local development vs. production](README.md#local-development-vs-production).
+
 ## 1. Prepare the server
+
+All production configuration lives in a single `.env` file on the server — you never edit
+`appsettings.json`. Copy `.env.example` to `/opt/mypasskeys/.env` and fill in the values flagged
+**REQUIRED IN PRODUCTION**:
 
 ```bash
 # On the server
@@ -12,8 +20,17 @@ mkdir -p /opt/mypasskeys
 # Copy .env.example to /opt/mypasskeys/.env and fill it in:
 #   POSTGRES_PASSWORD, REDIS_PASSWORD  -> strong unique values
 #   KEY_ENCRYPTION_KEY                 -> openssl rand -base64 32   (BACK THIS UP)
-#   RESEND_API_KEY                     -> if you want verification emails
+#                                         (or leave empty — ./deploy.sh generates one for you)
+#   DEPLOYMENT_HOST                    -> your public hostname, e.g. auth.example.com
+#   ISSUER_BASE_URL                    -> https://<that host>       (keep stable forever)
+#   BOOTSTRAP_OWNER_EMAIL              -> the account that owns the management tenant
+#   BOOTSTRAP_MANAGEMENT_ORIGIN        -> your admin-portal origin (first boot only)
+#   RESEND_API_KEY, RESEND_FROM_EMAIL  -> if you want verification emails
 ```
+
+`compose.prod.yaml` treats `DEPLOYMENT_HOST`, `ISSUER_BASE_URL` and `BOOTSTRAP_OWNER_EMAIL` as
+mandatory — the stack refuses to start if any is missing, so a misconfigured deploy fails loudly
+instead of silently 404'ing.
 
 ## 2. Point a reverse proxy at it
 
@@ -25,8 +42,8 @@ auth.example.com {
 }
 ```
 
-Set the same host in `MyPassKeys:DeploymentHosts` (via `appsettings.json` or the
-`MyPassKeys__DeploymentHosts__0` env var) so the host-gate middleware accepts it.
+`DEPLOYMENT_HOST` in `.env` must match this hostname — the host-gate middleware 404s any request
+whose `Host` isn't a deployment host (or a per-tenant custom subdomain).
 
 ## 3. Deploy
 
