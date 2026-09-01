@@ -119,10 +119,11 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
+# Feed the ALTER via stdin (NOT -c): psql only performs :'pw' variable interpolation on
+# stdin/-f input, not on -c strings. Interpolation quotes the password safely for any characters.
 $COMPOSE exec -T db sh -c '
-  psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-       -v pw="$POSTGRES_PASSWORD" \
-       -c "ALTER USER \"$POSTGRES_USER\" WITH PASSWORD :'"'"'pw'"'"';"
+  printf "%s\n" "ALTER USER \"$POSTGRES_USER\" WITH PASSWORD :'"'"'pw'"'"';" \
+    | psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v pw="$POSTGRES_PASSWORD"
 ' >/dev/null
 echo "Postgres role password now matches .env."
 REMOTE
