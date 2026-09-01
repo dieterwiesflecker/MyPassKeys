@@ -354,7 +354,8 @@ using (var bootstrapScope = app.Services.CreateScope())
       // (the pre-created user IS the invite), so they still attach their first passkey normally.
       RegistrationMode = RegistrationModes.InviteOnly,
       Hosts = [],
-      ServerName = "MyPassKeys Management",
+      // Slugs to the "passkeysapp" app-role namespace (app.passkeysapp) via TenantRoleModel.AppRoleName.
+      ServerName = app.Configuration["MyPassKeys:BootstrapServerName"] ?? "PasskeysApp",
       AllowedOrigins = bootstrapOrigins,
       // Env vars set to an empty string (e.g. ${BOOTSTRAP_MANAGEMENT_AUDIENCE:-} in compose.prod.yaml)
       // read back as "" rather than null, so treat blank as "not set" and fall back to the derived default.
@@ -367,7 +368,7 @@ using (var bootstrapScope = app.Services.CreateScope())
       JwtKeys = [TenantEndpoints.CreateKeyEntry(bootstrapKeyProtector)]
     };
     await bootstrapDb.UpsertTenantAsync(management);
-    foreach (var role in TenantRoleModel.BuiltInRoles())
+    foreach (var role in TenantRoleModel.BuiltInRoles(management))
       await bootstrapDb.UpsertRoleForTenantAsync(management.Id, role);
     await bootstrapRedis.GetDatabase().KeyDeleteAsync("Tenant:management");
 
@@ -384,7 +385,7 @@ using (var bootstrapScope = app.Services.CreateScope())
   foreach (var t in await bootstrapDb.GetAllTenantsAsync())
   {
     var existingRoles = (await bootstrapDb.GetRolesForTenantAsync(t.Id)).ToDictionary(r => r.Name);
-    foreach (var role in TenantRoleModel.BuiltInRoles())
+    foreach (var role in TenantRoleModel.BuiltInRoles(t))
     {
       if (!existingRoles.TryGetValue(role.Name, out var existing))
       {

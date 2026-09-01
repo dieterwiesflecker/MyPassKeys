@@ -113,6 +113,41 @@ stranded:
 Keep only two live KEKs at a time (current + one previous). Losing the current KEK with no valid
 backup makes all signing keys unrecoverable.
 
+## Rotating the database / Redis passwords
+
+Both passwords live in the server's `.env` (`POSTGRES_PASSWORD`, `REDIS_PASSWORD`). To change
+either, edit `.env` on the server and run a normal deploy:
+
+```bash
+./deploy.sh
+```
+
+- **Redis** just works — Redis reads its password from `--requirepass` on every start, so the
+  server and the app both pick up the new value from `.env` on the same restart; they can't drift
+  apart.
+- **Postgres** needs one extra bit of care that `deploy.sh` now handles for you. Postgres only
+  applies `POSTGRES_PASSWORD` when it **first initialises an empty data volume** — on an existing
+  volume the password stored inside the database wins and the env var is ignored. So a changed
+  `POSTGRES_PASSWORD` would otherwise leave the app authenticating with the *new* password against
+  a DB that still expects the *old* one (`password authentication failed`), while the `db`
+  healthcheck — `pg_isready`, which doesn't authenticate — keeps reporting healthy and hides it.
+
+  `deploy.sh` closes this gap: after starting the database (and before starting the app) it runs
+  `ALTER USER … WITH PASSWORD` to reset the stored password to whatever is in `.env`. It connects
+  over the container's local Unix socket, which the official Postgres image trusts without a
+  password, so it works even when the currently-stored password no longer matches. The step is
+  idempotent (on a fresh volume it sets the password to the value it already has).
+
+You can also run just the sync without a full deploy:
+
+```bash
+./deploy.sh sync-db-pw
+```
+
+> This resets the app's login role (`POSTGRES_USER`). It relies on the stock `postgres:18` image's
+> default of trusting local-socket connections — if you harden `pg_hba.conf` to require a password
+> there, you'd instead need the old password to change it.
+
 ## Restoring a PostgreSQL backup
 
 MyPassKeys uses Redis "version anchors" to detect document rollbacks, so a restored Postgres

@@ -12,6 +12,7 @@ set -euo pipefail
 #   ./deploy.sh              Build the image locally and deploy everything.
 #   ./deploy.sh rotate-kek   Start a key-encryption-key rotation (see DEPLOYMENT.md).
 #   ./deploy.sh retire-kek   Finish a rotation by dropping the previous KEK.
+#   ./deploy.sh sync-db-pw   Reset the Postgres role password to match .env.
 # ---------------------------------------------------------------------------
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,7 +30,7 @@ fi
 COMPOSE="docker compose -f compose.yaml -f compose.prod.yaml"
 
 usage() {
-  sed -n '3,15p' "$SCRIPT_DIR/deploy.sh" | sed 's/^# \{0,1\}//'
+  sed -n '3,16p' "$SCRIPT_DIR/deploy.sh" | sed 's/^# \{0,1\}//'
 }
 
 # --- Restart just the app container so it re-reads the .env (KEK changes need no rebuild) ---
@@ -91,6 +92,42 @@ retire_kek() {
   echo "=== Previous KEK retired. Rotation complete. ==="
 }
 
+# --- Re-sync the DB role password to whatever POSTGRES_PASSWORD is now in the server .env ---
+# Postgres only honours POSTGRES_PASSWORD when it initialises an EMPTY data volume; on an
+# existing volume the stored password wins and env changes are ignored. So rotating
+# POSTGRES_PASSWORD in .env alone would leave the app authenticating with the new password
+# against a DB that still expects the old one → "password authentication failed", and the
+# db healthcheck (pg_isready, which doesn't authenticate) would still report healthy, hiding it.
+# This resets the role password to match .env. It connects over the container's LOCAL UNIX
+# SOCKET, which the official postgres image trusts without a password, so it works even when
+# the currently-stored password no longer matches .env. The password is passed via the
+# container's own env (never on a command line) and quoted by psql's :'pw', so any characters
+# are safe. Idempotent: on a fresh volume it just sets the password to the value it already has.
+sync_db_password() {
+  echo "=== Syncing Postgres role password to .env value ==="
+  ssh "$SERVER" bash -s -- "$REMOTE_DIR" <<'REMOTE'
+set -euo pipefail
+cd "$1"
+COMPOSE="docker compose -f compose.yaml -f compose.prod.yaml"
+
+# Wait for Postgres to accept connections (pg_isready needs no password).
+for i in $(seq 1 30); do
+  if $COMPOSE exec -T db sh -c 'pg_isready -q -U "$POSTGRES_USER"' 2>/dev/null; then
+    break
+  fi
+  if [ "$i" = 30 ]; then echo "ERROR: Postgres did not become ready in time." >&2; exit 1; fi
+  sleep 2
+done
+
+$COMPOSE exec -T db sh -c '
+  psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+       -v pw="$POSTGRES_PASSWORD" \
+       -c "ALTER USER \"$POSTGRES_USER\" WITH PASSWORD :'"'"'pw'"'"';"
+' >/dev/null
+echo "Postgres role password now matches .env."
+REMOTE
+}
+
 full_deploy() {
   echo "=== Building mypasskeys image locally ==="
   docker compose build --pull mypasskeys
@@ -116,8 +153,16 @@ full_deploy() {
   echo "=== Pulling db + redis images on server ==="
   ssh "$SERVER" "cd $REMOTE_DIR && $COMPOSE pull db redis"
 
-  echo "=== Starting all services ==="
-  ssh "$SERVER" "cd $REMOTE_DIR && $COMPOSE up -d --force-recreate"
+  echo "=== Starting database + redis ==="
+  ssh "$SERVER" "cd $REMOTE_DIR && $COMPOSE up -d --force-recreate db redis"
+
+  # Make the running DB's role password match .env BEFORE the app starts, so a rotated
+  # POSTGRES_PASSWORD can't lock the app out. (Redis needs no equivalent: it re-reads
+  # --requirepass from .env on every restart, so server and client can't drift apart.)
+  sync_db_password
+
+  echo "=== Starting application ==="
+  ssh "$SERVER" "cd $REMOTE_DIR && $COMPOSE up -d --force-recreate mypasskeys"
 
   # Reclaim disk: each deploy loads a fresh image and rebuilds, leaving the previous images
   # dangling plus build cache behind — left unpruned this eventually fills the disk and Postgres
@@ -140,6 +185,7 @@ case "${1:-deploy}" in
   deploy)     full_deploy ;;
   rotate-kek) rotate_kek ;;
   retire-kek) retire_kek ;;
+  sync-db-pw) sync_db_password ;;
   -h|--help|help) usage ;;
   *) echo "Unknown command: $1"; echo ""; usage; exit 1 ;;
 esac

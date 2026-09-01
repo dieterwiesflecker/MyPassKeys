@@ -46,6 +46,35 @@ public static class Permissions
 
 public static class TenantRoleModel
 {
+    /// <summary>
+    /// The built-in role catalog for a specific tenant. Identical to <see cref="BuiltInRoles()"/>
+    /// except that for the management tenant the baseline <c>app</c> role is namespaced to
+    /// <c>app.&lt;slug(ServerName)&gt;</c> via <see cref="AppRoleName"/> — regular tenants get their
+    /// app-scoped role created by the client after tenant creation, but the management tenant is
+    /// bootstrapped server-side with no client, so it seeds the namespaced role directly.
+    /// </summary>
+    public static IEnumerable<TenantRole> BuiltInRoles(Tenant tenant)
+    {
+        foreach (var role in BuiltInRoles())
+        {
+            if (tenant.IsManagementTenant && role.Name == BuiltInTenantRoles.App)
+                role.Name = AppRoleName(tenant.ServerName);
+            yield return role;
+        }
+    }
+
+    /// <summary>
+    /// The app-scoped baseline role name for a tenant: <c>app.&lt;slug&gt;</c>, where slug is the
+    /// <paramref name="serverName"/> lower-cased with all non-alphanumeric characters stripped.
+    /// Namespacing the app role by tenant keeps it distinct from other apps' roles sharing a domain.
+    /// Falls back to the bare <c>app</c> name when the ServerName has no alphanumeric characters.
+    /// </summary>
+    public static string AppRoleName(string serverName)
+    {
+        var slug = new string((serverName ?? "").Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+        return slug.Length == 0 ? BuiltInTenantRoles.App : $"{BuiltInTenantRoles.App}.{slug}";
+    }
+
     /// <summary>The built-in roles seeded into a new tenant's catalog.</summary>
     public static IEnumerable<TenantRole> BuiltInRoles()
     {
