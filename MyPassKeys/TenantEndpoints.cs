@@ -298,7 +298,9 @@ public static class TenantEndpoints
         if (nameCollision != null)
             return Results.Conflict($"ServerName '{serverName}' is already in use by another tenant.");
 
-        var registrationMode = (request.RegistrationMode ?? RegistrationModes.Open).Trim().ToLowerInvariant();
+        // Default to invite-only when the caller omits a mode — a new tenant must not silently
+        // accept anonymous self-registration; the owner opts into 'open'/'domain-allowlist' explicitly.
+        var registrationMode = (request.RegistrationMode ?? RegistrationModes.InviteOnly).Trim().ToLowerInvariant();
         if (!RegistrationModes.All.Contains(registrationMode))
             return Results.BadRequest(
                 $"RegistrationMode must be one of: {string.Join(", ", RegistrationModes.All)}.");
@@ -383,7 +385,7 @@ public static class TenantEndpoints
         // Seed the built-in role catalog (tenantadmin / useradmin). Any further "standard" roles
         // (admin/editor/writer, the app-scoped app.<serverName> role, etc.) are an application
         // concern and are created by the client after creation — the backend stays generic.
-        foreach (var role in TenantRoleModel.BuiltInRoles())
+        foreach (var role in TenantRoleModel.BuiltInRoles(tenant))
             await dbService.UpsertRoleForTenantAsync(tenant.Id, role);
 
         // The creator becomes a tenantadmin member of the new tenant — this membership (a
