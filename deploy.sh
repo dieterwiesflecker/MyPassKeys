@@ -10,6 +10,7 @@ set -euo pipefail
 #
 # Usage:
 #   ./deploy.sh              Build the image locally and deploy everything.
+#   ./deploy.sh restart      Recreate the app container so it re-reads .env (no rebuild).
 #   ./deploy.sh rotate-kek   Start a key-encryption-key rotation (see DEPLOYMENT.md).
 #   ./deploy.sh retire-kek   Finish a rotation by dropping the previous KEK.
 #   ./deploy.sh sync-db-pw   Reset the Postgres role password to match .env.
@@ -148,6 +149,31 @@ full_deploy() {
   echo "=== Ensuring KEY_ENCRYPTION_KEY is set ==="
   ssh "$SERVER" "grep -q '^KEY_ENCRYPTION_KEY=..*' $REMOTE_DIR/.env || { umask 077; echo \"KEY_ENCRYPTION_KEY=\$(openssl rand -base64 32)\" >> $REMOTE_DIR/.env; echo 'Generated new KEY_ENCRYPTION_KEY in .env'; }"
 
+  # Pre-flight the server .env so a missing value can't silently break the deploy. The infra/identity
+  # keys hard-fail (compose can't run without them); Resend is a warning (email is optional, but a
+  # missing/placeholder from-address means Resend rejects every send). Sent over stdin so nothing
+  # expands locally; $1 is the remote dir.
+  echo "=== Validating server .env ==="
+  ssh "$SERVER" bash -s -- "$REMOTE_DIR" <<'PREFLIGHT'
+    set -euo pipefail
+    ENV="$1/.env"
+    val() { grep -m1 "^$1=" "$ENV" | cut -d= -f2- || true; }
+    missing=0
+    for k in POSTGRES_USER POSTGRES_DB POSTGRES_PASSWORD REDIS_PASSWORD \
+             DEPLOYMENT_HOST ISSUER_BASE_URL BOOTSTRAP_OWNER_EMAIL KEY_ENCRYPTION_KEY; do
+      if [ -z "$(val "$k")" ]; then echo "ERROR: $k is missing or empty in .env"; missing=1; fi
+    done
+    [ "$missing" -eq 0 ] || { echo "Aborting: fill the missing values in $ENV and re-run."; exit 1; }
+
+    # Email (Resend) — warn, don't block. A missing key means codes are logged not sent; a missing or
+    # placeholder from-address means Resend rejects the send (unverified domain).
+    [ -n "$(val RESEND_API_KEY)" ] || echo "WARNING: RESEND_API_KEY is empty — verification emails will NOT be sent (codes are logged only)."
+    from="$(val RESEND_FROM_EMAIL)"
+    if [ -z "$from" ] || [ "$from" = "noreply@example.com" ]; then
+      echo "WARNING: RESEND_FROM_EMAIL is missing or still the noreply@example.com placeholder — Resend will REJECT sends from an unverified domain. Set it to an address on a domain you verified in Resend."
+    fi
+PREFLIGHT
+
   echo "=== Loading image on server ==="
   ssh "$SERVER" "cd $REMOTE_DIR && docker load < mypasskeys.tar.gz && rm mypasskeys.tar.gz"
 
@@ -184,6 +210,7 @@ full_deploy() {
 
 case "${1:-deploy}" in
   deploy)     full_deploy ;;
+  restart)    restart_app ;;
   rotate-kek) rotate_kek ;;
   retire-kek) retire_kek ;;
   sync-db-pw) sync_db_password ;;
